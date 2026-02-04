@@ -59,6 +59,11 @@
             "tag": "v1",
             "new_classes": ["Sandbox"],
         },
+        {
+            "tag": "v2",
+            // Leave this empty or use it for future new classes.
+            // This tells Cloudflare "we are now at version 2."
+        },
     ],
     // R2 bucket for persistent storage (moltbot data, conversations, etc.)
     "r2_buckets": [
