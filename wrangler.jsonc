@@ -52,17 +52,12 @@
     },
     "migrations": [
         {
-            "new_sqlite_classes": ["Sandbox"],
             "tag": "v1",
-        },
-        {
-            "tag": "v1",
-            "new_classes": ["Sandbox"],
+            // We removed the new_classes line here because it's already done
         },
         {
             "tag": "v2",
-            // Leave this empty or use it for future new classes.
-            // This tells Cloudflare "we are now at version 2."
+            // This new tag satisfies the requirement for a unique identifier
         },
     ],
     // R2 bucket for persistent storage (moltbot data, conversations, etc.)
