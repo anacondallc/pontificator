@@ -38,7 +38,7 @@
         {
             "class_name": "Sandbox",
             "image": "./Dockerfile",
-            "instance_type": "standard-1",
+            "instance_type": "standard-4",
             "max_instances": 1,
         },
     ],
@@ -50,7 +50,27 @@
             },
         ],
     },
-
+    "migrations": [
+        {
+            "new_sqlite_classes": ["Sandbox"],
+            "tag": "v1",
+        },
+        {
+            "tag": "v1",
+            "new_classes": ["Sandbox"],
+        },
+        {
+            "tag": "v2",
+        },
+    ],
+    // R2 bucket for persistent storage (moltbot data, conversations, etc.)
+    "r2_buckets": [
+        {
+            "binding": "MOLTBOT_BUCKET",
+            "bucket_name": "pontificator-data",
+            "preview_bucket_name": "pontificator-data",
+        },
+    ],
     // Browser Rendering binding for CDP shim
     "browser": {
         "binding": "BROWSER",
