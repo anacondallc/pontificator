@@ -26,11 +26,7 @@ import { getSandbox, Sandbox, type SandboxOptions } from "@cloudflare/sandbox";
 import type { AppEnv, MoltbotEnv } from "./types";
 import { MOLTBOT_PORT } from "./config";
 import { createAccessMiddleware } from "./auth";
-import {
-    ensureMoltbotGateway,
-    findExistingMoltbotProcess,
-    syncToR2,
-} from "./gateway";
+import { ensureMoltbotGateway, findExistingMoltbotProcess } from "./gateway";
 import { publicRoutes, api, adminUi, debug, cdp } from "./routes";
 import { redactSensitiveParams } from "./utils/logging";
 import loadingPageHtml from "./assets/loading.html";
@@ -79,17 +75,27 @@ function validateRequiredEnv(env: MoltbotEnv): string[] {
         }
     }
 
-    // Check for AI Gateway or direct Anthropic configuration
-    if (env.AI_GATEWAY_API_KEY) {
-        // AI Gateway requires both API key and base URL
-        if (!env.AI_GATEWAY_BASE_URL) {
-            missing.push(
-                "AI_GATEWAY_BASE_URL (required when using AI_GATEWAY_API_KEY)",
-            );
-        }
-    } else if (!env.ANTHROPIC_API_KEY) {
-        // Direct Anthropic access requires API key
-        missing.push("ANTHROPIC_API_KEY or AI_GATEWAY_API_KEY");
+    // Check for AI provider configuration (at least one must be set)
+    const hasCloudflareGateway = !!(
+        env.CLOUDFLARE_AI_GATEWAY_API_KEY &&
+        env.CF_AI_GATEWAY_ACCOUNT_ID &&
+        env.CF_AI_GATEWAY_GATEWAY_ID
+    );
+    const hasLegacyGateway = !!(
+        env.AI_GATEWAY_API_KEY && env.AI_GATEWAY_BASE_URL
+    );
+    const hasAnthropicKey = !!env.ANTHROPIC_API_KEY;
+    const hasOpenAIKey = !!env.OPENAI_API_KEY;
+
+    if (
+        !hasCloudflareGateway &&
+        !hasLegacyGateway &&
+        !hasAnthropicKey &&
+        !hasOpenAIKey
+    ) {
+        missing.push(
+            "ANTHROPIC_API_KEY, OPENAI_API_KEY, or CLOUDFLARE_AI_GATEWAY_API_KEY + CF_AI_GATEWAY_ACCOUNT_ID + CF_AI_GATEWAY_GATEWAY_ID",
+        );
     }
 
     return missing;
@@ -256,6 +262,7 @@ app.all("*", async (c) => {
                 console.error("[PROXY] Background gateway start failed:", err);
             }),
         );
+
         // Return the loading page immediately
         return c.html(loadingPageHtml);
     }
@@ -300,9 +307,19 @@ app.all("*", async (c) => {
             console.log("[WS] URL:", url.pathname + redactedSearch);
         }
 
+        // Inject gateway token into WebSocket request if not already present.
+        // CF Access redirects strip query params, so authenticated users lose ?token=.
+        // Since the user already passed CF Access auth, we inject the token server-side.
+        let wsRequest = request;
+        if (c.env.MOLTBOT_GATEWAY_TOKEN && !url.searchParams.has("token")) {
+            const tokenUrl = new URL(url.toString());
+            tokenUrl.searchParams.set("token", c.env.MOLTBOT_GATEWAY_TOKEN);
+            wsRequest = new Request(tokenUrl.toString(), request);
+        }
+
         // Get WebSocket connection to the container
         const containerResponse = await sandbox.wsConnect(
-            request,
+            wsRequest,
             MOLTBOT_PORT,
         );
         console.log(
@@ -474,35 +491,6 @@ app.all("*", async (c) => {
     });
 });
 
-/**
- * Scheduled handler for cron triggers.
- * Syncs moltbot config/state from container to R2 for persistence.
- */
-async function scheduled(
-    _event: ScheduledEvent,
-    env: MoltbotEnv,
-    _ctx: ExecutionContext,
-): Promise<void> {
-    const options = buildSandboxOptions(env);
-    const sandbox = getSandbox(env.Sandbox, "moltbot", options);
-
-    console.log("[cron] Starting backup sync to R2...");
-    const result = await syncToR2(sandbox, env);
-    if (result.success) {
-        console.log(
-            "[cron] Backup sync completed successfully at",
-            result.lastSync,
-        );
-    } else {
-        console.error(
-            "[cron] Backup sync failed:",
-            result.error,
-            result.details || "",
-        );
-    }
-}
-
 export default {
     fetch: app.fetch,
-    scheduled,
 };
