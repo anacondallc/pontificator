@@ -7,6 +7,29 @@
 # 4. Starts a background sync loop (rclone, watches for file changes)
 # 5. Starts the gateway
 
+# Map your legacy binding to the script's expected variable
+export BUCKET=$MOLTBOT_BUCKET
+export BUCKET_NAME="pontificator-data"
+
+# Force the script to ignore the 'workspace/' prefix since your files are at root
+export R2_PREFIX=""
+
+# --- PATCH START: Legacy Path Translation ---
+# Force the script to look at the R2 root instead of a 'workspace/' folder
+alias wrangler-get="npx wrangler r2 object get pontificator-data"
+
+# Create the directory the agent expects
+mkdir -p /data/moltbot
+mkdir -p /root/clawd
+
+# Manually pull the essentials from your R2 root
+npx wrangler r2 object get pontificator-data/IDENTITY.md --file=/data/moltbot/IDENTITY.md --remote 2>/dev/null
+npx wrangler r2 object get pontificator-data/USER.md --file=/data/moltbot/USER.md --remote 2>/dev/null
+
+# Link the two possible workspace paths so the bot finds its files
+ln -s /data/moltbot/* /root/clawd/ 2>/dev/null
+# --- PATCH END ---
+
 set -e
 
 if pgrep -f "openclaw gateway" > /dev/null 2>&1; then
