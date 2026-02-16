@@ -243,6 +243,22 @@ app.all("*", async (c) => {
 
     console.log("[PROXY] Handling request:", url.pathname);
 
+    // ADD THIS DEBUG SNIPPET HERE:
+    const passedKeys = Object.keys(c.env).filter(
+        (key) => typeof c.env[key] === "string",
+    );
+    console.log(
+        "[DEBUG] Passing these keys to Sandbox:",
+        passedKeys.join(", "),
+    );
+    if (passedKeys.includes("BRAVE_API_KEY")) {
+        console.log(
+            "[DEBUG] ✅ BRAVE_API_KEY is confirmed in the transfer list.",
+        );
+    } else {
+        console.error("[DEBUG] ❌ BRAVE_API_KEY is NOT in the transfer list!");
+    }
+
     // Check if gateway is already running
     const existingProcess = await findExistingMoltbotProcess(sandbox);
     const isGatewayReady =
